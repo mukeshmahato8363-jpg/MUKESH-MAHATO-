@@ -4,8 +4,7 @@ const path = require("path");
 const crypto = require("crypto");
 
 const PORT = process.env.PORT || 3000;
-const ADMIN_KEY = process.env.ADMIN_KEY || "ARSH@2026"; // <-- Apna Admin Password yahan change kar sakte hain
-const PUBLIC_DIR = path.join(__dirname, "public");
+const ADMIN_KEY = process.env.ADMIN_KEY || "ARSH@2026";
 const DB_FILE = path.join(__dirname, "keys-db.json");
 
 const TUNNEL_SECRET = "RX_V12_QUANTUM_SHIELD_9941_ARSH_ENCRYPTED_TUNNEL_KEY";
@@ -382,9 +381,28 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
-  let rel = urlPath === "/" ? "index.html" : urlPath.replace(/^\/+/, "");
-  const filePath = path.normalize(path.join(PUBLIC_DIR, rel));
-  if (!filePath.startsWith(PUBLIC_DIR)) { res.writeHead(403); return res.end("Forbidden"); }
+  let cleanPath = urlPath === "/" ? "index.html" : urlPath.replace(/^\/+/, "");
+  const baseName = path.basename(cleanPath);
+  if (["server.js", "package.json", "keys-db.json"].includes(cleanPath) || ["server.js", "package.json", "keys-db.json"].includes(baseName)) {
+    res.writeHead(403);
+    return res.end("Forbidden");
+  }
+
+  const candidates = [
+    path.normalize(path.join(__dirname, "public", cleanPath)),
+    path.normalize(path.join(__dirname, cleanPath)),
+    path.normalize(path.join(__dirname, "public", baseName)),
+    path.normalize(path.join(__dirname, baseName))
+  ].filter((p) => p.startsWith(__dirname + path.sep));
+
+  const filePath = candidates.find((p) => {
+    try { return fs.statSync(p).isFile(); } catch { return false; }
+  });
+
+  if (!filePath) {
+    res.writeHead(404);
+    return res.end("Not Found");
+  }
 
   fs.readFile(filePath, (err, content) => {
     if (err) {
